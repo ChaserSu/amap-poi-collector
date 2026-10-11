@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高德 POI 数据采集 · 本地版（Web API v5）</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+:root{
+  --primary:#6d5ce7; --primary-d:#5846d6; --primary-l:#f0eefe;
+  --green:#10b981; --red:#ef4444; --orange:#f59e0b; --blue:#1a73e8;
+  --bg:#f4f5fa; --card:#fff; --text:#1f2430; --muted:#8a90a2; --line:#e8eaf2;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);font-size:13px}
+#app{display:flex;flex-direction:column;height:100%}
+/* ===== 顶栏 ===== */
+.topbar{height:52px;background:linear-gradient(90deg,#2b2350,#3d2f7a);color:#fff;display:flex;align-items:center;padding:0 20px;gap:12px;flex:none;z-index:1000}
+.topbar .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#8b7bff,#6d5ce7);display:flex;align-items:center;justify-content:center;font-size:16px}
+.topbar h1{font-size:16px;font-weight:600;letter-spacing:.5px}
+.topbar .sub{font-size:11px;opacity:.65;margin-left:4px}
+.topbar .right{margin-left:auto;display:flex;gap:14px;font-size:12px;opacity:.85}
+.topbar .right span{cursor:default}
+/* ===== 布局 ===== */
+.main{flex:1;display:flex;min-height:0}
+.sidebar{width:360px;flex:none;background:var(--bg);overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+#map{position:absolute;inset:0;background:#e6e9f0}
+/* ===== 卡片 ===== */
+.card{background:var(--card);border-radius:12px;box-shadow:0 2px 10px rgba(60,50,120,.06);padding:14px 16px}
+.card-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:12px}
+.badge{width:20px;height:20px;border-radius:50%;background:var(--primary);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:600}
+.field{margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+.field label{display:block;font-size:12px;color:#555;margin-bottom:4px;font-weight:500}
+input[type=text],input[type=password],select{width:100%;height:34px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font-size:12.5px;background:#fbfbfe;color:var(--text);outline:none}
+input:focus,select:focus{border-color:var(--primary);background:#fff}
+input::placeholder{color:#b4b9c9}
+.row2{display:flex;gap:8px}
+.row2>*{flex:1;min-width:0}
+.hint{font-size:11px;color:var(--muted);line-height:1.6;margin-top:5px}
+.hint a{color:var(--primary);text-decoration:none}
+/* 域名选择 */
+.domain-radio{display:flex;gap:6px;margin-bottom:8px}
+.domain-radio label{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;height:32px;border:1px solid var(--line);border-radius:8px;font-size:12px;cursor:pointer;background:#fbfbfe}
+.domain-radio input{width:auto;margin-right:2px}
+.domain-radio label:has(input:checked){border-color:var(--primary);background:var(--primary-l);color:var(--primary-d);font-weight:600}
+.key-row{position:relative}
+.key-row .eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:#b0b5c5;font-size:13px;user-select:none}
+.btn{border:none;border-radius:8px;height:34px;padding:0 14px;font-size:12.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:.15s;white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--primary-d)}
+.btn-outline{background:#fff;color:var(--primary);border:1px solid var(--primary)}
+.btn-outline:hover:not(:disabled){background:var(--primary-l)}
+.btn-block{width:100%}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:hover:not(:disabled){background:#0e9f6e}
+.btn-red{background:#fda4af;color:#9f1239}
+.btn-red:hover:not(:disabled){background:#fb7185;color:#fff}
+.btn-purple-soft{background:#a78bfa;color:#fff}
+.btn-mint{background:#6ee7b7;color:#065f46}
+.btn-mint:hover:not(:disabled){background:#34d399;color:#fff}
+.btn-sm{height:28px;font-size:11.5px;padding:0 10px}
+/* 状态框 */
+.status-box{margin-top:8px;border-radius:8px;padding:9px 11px;font-size:11.5px;line-height:1.7;display:none;background:var(--primary-l);color:var(--primary-d);word-break:break-all}
+.status-box.err{background:#fef2f2;color:#b91c1c}
+.status-box.ok{background:#ecfdf5;color:#047857}
+/* 分类树 */
+.cats-panel{border:1px solid var(--line);border-radius:8px;max-height:230px;overflow-y:auto;padding:8px 10px;background:#fbfbfe}
+.cat-line{display:flex;align-items:center;font-size:12px;padding:2px 0}
+.cat-line input{width:auto;margin-right:6px}
+.cat-line .expand{margin-left:auto;cursor:pointer;color:var(--muted);font-size:10px;width:18px;text-align:center;user-select:none}
+.cat-line .expand:hover{color:var(--primary)}
+.mid-box{display:none;padding:2px 0 4px 22px}
+.mid-box.open{display:block}
+.mid-box label{display:inline-flex;width:50%;align-items:center;font-size:11px;color:#555;padding:1px 0;font-weight:400}
+.mid-box input{width:auto;margin-right:4px}
+.cat-meta{font-size:11px;color:var(--muted);margin-top:5px;display:flex;justify-content:space-between}
+/* 控制按钮 */
+.ctrl-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:10px}
+.ctrl-grid .btn{padding:0 4px}
+.dl-row{display:flex;gap:8px;margin-top:8px;align-items:center}
+.usage-pill{font-size:11px;background:#f1f3fa;border:1px solid var(--line);border-radius:20px;padding:5px 11px;color:#555;white-space:nowrap}
+.usage-pill b{color:var(--primary)}
+/* 进度 */
+#crawlPanel{display:none}
+.progress-track{height:8px;background:#e9eaf5;border-radius:6px;overflow:hidden;margin:8px 0 5px}
+.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#34d399,#10b981);border-radius:6px;transition:width .3s}
+#progressText{font-size:11.5px;color:#555;line-height:1.7}
+.stats-line{font-size:11.5px;color:var(--primary-d);margin:3px 0}
+.stats-line b{font-size:13px}
+.log-box{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:11px;color:#4b5563;max-height:128px;overflow-y:auto;margin-top:6px;line-height:1.7}
+.log-box .err{color:var(--red)}
+.log-box .warn{color:#d97706}
+.log-box .ok{color:#059669}
+/* 高级 */
+.adv-toggle{font-size:11.5px;color:var(--primary);cursor:pointer;margin-top:8px;user-select:none}
+.adv-box{display:none;margin-top:8px}
+.adv-box.open{display:block}
+.adv-box .row2 input{height:30px;font-size:12px}
+/* 地图浮层 */
+.map-float{position:absolute;z-index:800;background:rgba(255,255,255,.94);border-radius:10px;box-shadow:0 4px 16px rgba(40,30,90,.15);padding:8px 12px;font-size:11.5px;color:#444;line-height:1.8}
+#mapLegend{left:12px;top:12px;pointer-events:none}
+.legend-dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+#tableToggle{right:12px;bottom:12px;cursor:pointer;font-weight:600;color:var(--primary-d)}
+#tableToggle:hover{background:#fff}
+/* 结果表抽屉 */
+#tableDrawer{position:absolute;z-index:900;left:12px;right:12px;bottom:12px;height:300px;background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(40,30,90,.2);display:none;flex-direction:column;overflow:hidden}
+#tableDrawer.open{display:flex}
+.dt-head{padding:9px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;font-weight:600;font-size:13px;flex:none}
+.dt-head .dt-close{margin-left:auto;cursor:pointer;color:var(--muted);font-size:16px}
+.dt-wrap{overflow:auto;flex:1}
+table.poi{border-collapse:collapse;width:100%;font-size:11.5px}
+table.poi th{position:sticky;top:0;background:#f6f7fc;color:#5a6076;font-weight:600;padding:7px 9px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
+table.poi td{padding:6px 9px;border-bottom:1px solid #f0f1f7;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+table.poi tr{cursor:pointer}
+table.poi tr:hover td{background:var(--primary-l)}
+.tag-type{color:var(--primary-d)}
+.dt-foot{padding:6px 14px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);flex:none;background:#fafbfe}
+/* leaflet popup */
+.leaflet-popup-content{font-size:12px;line-height:1.7;max-width:290px}
+.popup-name{font-size:13.5px;font-weight:600;margin-bottom:4px}
+.popup-row{color:#444}.popup-row b{color:#888;font-weight:500;display:inline-block;min-width:52px}
+.popup-img{margin-top:5px;width:100%;border-radius:6px;max-height:130px;object-fit:cover}
+/* 滚动条 */
+::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-thumb{background:#d3d7e6;border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+@media(max-width:860px){.sidebar{width:300px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="logo">🗺️</div>
+    <h1>高德 POI 数据采集</h1><span class="sub">本地版 · Web API v5 · 行政区全量递归采集</span>
+    <div class="right"><span id="topCount">POI 0</span><span>已用请求 0</span></div>
+  </div>
+  <div class="main">
+    <!-- ============ 侧边栏 ============ -->
+    <div class="sidebar">
+      <!-- 卡片 1：接口与密钥 -->
+      <div class="card">
+        <div class="card-title"><span class="badge">1</span>接口域名与 API 密钥</div>
+        <div class="field">
+          <label>服务域名（官方 / 中转站可自由切换）</label>
+          <div class="domain-radio">
+            <label><input type="radio" name="domainMode" value="official">高德官方</label>
+            <label><input type="radio" name="domainMode" value="relay">中转站</label>
+            <label><input type="radio" name="domainMode" value="custom">自定义</label>
+          </div>
+          <select id="relaySelect" style="display:none;margin-bottom:6px">
+            <option value="https://mapapi.cc">禾悦 mapapi.cc（兼容 v5）</option>
+          </select>
+          <input type="text" id="customBase" placeholder="自定义域名，如 https://your-proxy.com" style="display:none">
+          <div class="hint">官方域名为 <b>restapi.amap.com</b>，需高德「Web服务」类型 Key；中转站使用其自身 Key。所有请求由浏览器直接发出，Key 仅保存在本机浏览器。</div>
+        </div>
+        <div class="field key-row">
+          <label>API Key</label>
+          <input type="password" id="apiKey" placeholder="请输入 API Key" autocomplete="off">
+          <span class="eye" id="eyeBtn">显示</span>
+        </div>
+        <div class="row2">
+          <button class="btn btn-outline btn-sm" id="testBtn">🔌 连接测试</button>
+          <button class="btn btn-outline btn-sm" id="clearCfgBtn">清除本机配置</button>
+        </div>
+        <div class="status-box" id="apiStatus"></div>
+      </div>
+
+      <!-- 卡片 2：城市选择 -->
+      <div class="card">
+        <div class="card-title"><span class="badge">2</span>选择采集行政区</div>
+        <div class="field">
+          <label>快速搜索（名称或 adcode，自动联动三级选择）</label>
+          <input type="text" id="districtSearch" list="districtList" placeholder="如：海陵、泰州、朝阳、320102" autocomplete="off">
+          <datalist id="districtList"></datalist>
+        </div>
+        <div class="field">
+          <label>省级行政区</label>
+          <select id="selProv"></select>
+        </div>
+        <div class="field">
+          <label>地级市 / 地区</label>
+          <select id="selCity"></select>
+        </div>
+        <div class="field">
+          <label>区 / 县 / 县级市（首项为全市）</label>
+          <select id="selCounty"></select>
+        </div>
+        <button class="btn btn-primary btn-block" id="fetchBoundaryBtn">拉取行政区真实边界</button>
+        <div class="status-box" id="boundaryStatus"></div>
+      </div>
+
+      <!-- 卡片 3：采集参数 -->
+      <div class="card">
+        <div class="card-title"><span class="badge">3</span>采集参数</div>
+        <div class="field">
+          <label>POI 类别（可多选，支持展开至中类）</label>
+          <div class="cats-panel" id="catsPanel"></div>
+          <div class="cat-meta"><span id="catHint">已选 1 个类别：餐饮服务</span><span id="typeLen"></span></div>
+        </div>
+        <div class="field">
+          <label>关键词（可选，仅支持单个关键词，与类别叠加）</label>
+          <input type="text" id="keywordInput" placeholder="如：火锅、学校、加油站" maxlength="80">
+        </div>
+        <div class="adv-toggle" id="advToggle">▸ 高级参数</div>
+        <div class="adv-box" id="advBox">
+          <div class="row2">
+            <div><label style="font-size:11px;color:#888">请求间隔(ms)</label><input type="text" id="intervalInput" value="150"></div>
+            <div><label style="font-size:11px;color:#888">最大递归深度</label><input type="text" id="depthInput" value="12"></div>
+          </div>
+          <label style="display:flex;align-items:center;font-size:11.5px;color:#555;margin-top:7px"><input type="checkbox" id="dedupChk" style="width:auto;margin-right:5px">结果同店清洗（同名同址 / 同名同电话去重）</label>
+          <div class="hint">单格每页 25 条、同参数最多取 200 条；第 8 页仍满则自动四分递归（四叉树，无盲区），格与区划边界相交才抓取，最终仅保留边界内 POI。</div>
+        </div>
+
+        <div class="ctrl-grid">
+          <button class="btn btn-green" id="crawlBtn">▶ 开始采集</button>
+          <button class="btn btn-red" id="pauseBtn" disabled>暂停</button>
+          <button class="btn btn-purple-soft" id="resumeBtn" disabled>继续</button>
+          <button class="btn btn-red" id="stopBtn" disabled>停止</button>
+        </div>
+        <div class="dl-row">
+          <button class="btn btn-mint" id="downloadBtn" disabled style="flex:1">⬇ 下载 POI 结果 CSV</button>
+          <span class="usage-pill">已用 <b id="callCount">0</b> 次</span>
+        </div>
+
+        <div id="crawlPanel">
+          <div class="progress-track"><div class="progress-fill" id="progressBar"></div></div>
+          <div id="progressText">准备中…</div>
+          <div class="stats-line" id="statsLine"></div>
+          <div class="log-box" id="logBox"></div>
+        </div>
+      </div>
+      <div class="hint" style="text-align:center;padding:0 6px 8px">
+        数据 © 高德地图 · 四叉树算法与 extensions=all 全字段采集 · 本页面完全在本机浏览器运行
+      </div>
+    </div>
+
+    <!-- ============ 地图 ============ -->
+    <div style="position:relative;flex:1;min-width:0">
+      <div id="map"></div>
+      <div class="map-float" id="mapLegend">
+        <div><span class="legend-dot" style="background:#1a73e8"></span>行政区真实边界</div>
+        <div><span class="legend-dot" style="background:#f59e0b"></span>已分裂网格（密度≥200）</div>
+        <div><span class="legend-dot" style="background:#22c55e"></span>叶子网格（已采完）</div>
+        <div><span class="legend-dot" style="background:#6d5ce7;border-radius:50%"></span>POI 点位</div>
+      </div>
+      <div class="map-float" id="tableToggle">📋 结果列表（<span id="floatCount">0</span>）</div>
+      <div id="tableDrawer">
+        <div class="dt-head">📋 采集结果预览 <span style="font-size:11px;color:#888;font-weight:400" id="dtTitle"></span><span class="dt-close" id="tableClose">×</span></div>
+        <div class="dt-wrap">
+          <table class="poi">
+            <thead><tr>
+              <th>名称</th><th>大类</th><th>中类</th><th>区县</th><th>地址</th><th>电话</th><th>评分</th><th>人均</th><th>营业时间</th>
+            </tr></thead>
+            <tbody id="poiTbody"></tbody>
+          </table>
+        </div>
+        <div class="dt-foot" id="dtFoot">完整数据请下载 CSV（含电话/评分/人均/营业时间/标签/图片/坐标等 extensions=all 全字段）</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="data.js"></script>
+<script>
+(function(){
+'use strict';
+/* ================================================================
+ * 0. 工具
+ * ================================================================*/
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const sv=v=>typeof v==='string'?v:'';
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function nowStr(){const d=new Date(),p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())}
+function log(msg,cls){const b=$('logBox');const d=document.createElement('div');if(cls)d.className=cls;d.textContent='['+nowStr()+'] '+msg;b.appendChild(d);b.scrollTop=b.scrollHeight;while(b.children.length>200)b.removeChild(b.firstChild)}
+
+/* ================================================================
+ * 1. 配置（localStorage 持久化）
+ * ================================================================*/
+const LS_KEY='amap_poi_collector_cfg_v2';
+const DEFAULT_CATS={'050000':{},'060000':{},'070000':{}}; // 餐饮服务 / 购物服务 / 生活服务
+let cfg={mode:'relay',relay:'https://mapapi.cc',custom:'',key:'',prov:'110000',city:'110000',county:'110101',
+         cats:Object.assign({},DEFAULT_CATS),keyword:'',interval:150,depth:12,dedup:false};
+try{
+  const saved=JSON.parse(localStorage.getItem(LS_KEY)||'null');
+  if(saved)Object.assign(cfg,saved);
+  else{
+    // 首访 v2：迁移旧版 Key/域名/城市等，类别沿用新默认（餐饮+购物+生活）
+    const old=JSON.parse(localStorage.getItem('amap_poi_collector_cfg_v1')||'null');
+    if(old)['mode','relay','custom','key','prov','city','county','keyword','interval','depth','dedup']
+      .forEach(k=>{if(old[k]!=null)cfg[k]=old[k]});
+    saveCfg();
+  }
+}catch(e){}
+function saveCfg(){localStorage.setItem(LS_KEY,JSON.stringify(cfg))}
+function baseUrl(){
+  if(cfg.mode==='official')return 'https://restapi.amap.com';
+  if(cfg.mode==='relay')return cfg.relay;
+  return (cfg.custom||'').replace(/\/+$/,'');
+}
+
+/* ================================================================
+ * 2. 城市三级联动（数据来自官方 adcode_citycode 表）
+ * ================================================================*/
+const C=window.AMAP_CITIES;
+function fillSelect(sel,items,placeholder){
+  sel.innerHTML='';
+  items.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o)});
+}
+// 省
+fillSelect($('selProv'),C.provinces.map(p=>[p.a,p.n]));
+$('selProv').value=cfg.prov;
+function onProv(){
+  const pa=$('selProv').value;cfg.prov=pa;
+  let cities=(C.cities[pa]||[]).slice();
+  // 普通省（非直辖市/港澳台虚拟市）在市级列表头部补一个「全省」项
+  const direct=cities.length===1&&cities[0].a===pa;
+  if(!direct)cities=[{n:'— 全省 —',a:pa}].concat(cities);
+  fillSelect($('selCity'),cities.map(c=>[c.a,c.n]));
+  if(cities.some(c=>c.a===cfg.city))$('selCity').value=cfg.city;
+  onCity();
+}
+function onCity(){
+  const ca=$('selCity').value;cfg.city=ca;
+  const list=C.counties[ca]||[];
+  const items=[];
+  if(ca.endsWith('0000'))items.push([ca,list.length?'— 全省 / 全市 —':'— 全省 —']);
+  else if(!ca.startsWith('@'))items.push([ca,'— 全市 —']); // 含东莞/中山等直筒子市
+  list.forEach(c=>items.push([c.a,c.n]));
+  if(!items.length)items.push([ca,'— 全市 —']);           // 兜底
+  fillSelect($('selCounty'),items);
+  if(items.some(([a])=>a===cfg.county))$('selCounty').value=cfg.county;
+  cfg.county=$('selCounty').value;
+  saveCfg();
+}
+$('selProv').addEventListener('change',onProv);
+$('selCity').addEventListener('change',onCity);
+$('selCounty').addEventListener('change',()=>{cfg.county=$('selCounty').value;saveCfg()});
+
+/* ---------- 行政区快速搜索（全省/市/区县，约 3600 条，名称与 adcode 均可搜） ---------- */
+const districtMap={};
+(function buildDistrictSearch(){
+  const frag=document.createDocumentFragment();
+  const add=(text,p,c,q)=>{districtMap[text]={p,c,q};const o=document.createElement('option');o.value=text;frag.appendChild(o)};
+  C.provinces.forEach(prov=>{
+    add(prov.n+'（全省）　'+prov.a,prov.a,prov.a,prov.a); // 省级
+    (C.cities[prov.a]||[]).forEach(city=>{
+      const cn=city.n.replace('（全市）','');
+      if(city.a.startsWith('@')){
+        // 省直辖县级行政区（济源、仙桃、石河子等）
+        (C.counties[city.a]||[]).forEach(ct=>add(prov.n+' / '+ct.n+'　'+ct.a,prov.a,city.a,ct.a));
+      }else{
+        add(prov.n+' / '+cn+'（全市）　'+city.a,prov.a,city.a,city.a);
+        (C.counties[city.a]||[]).forEach(ct=>
+          add(prov.n+' / '+cn+' / '+ct.n+'　'+ct.a,prov.a,city.a,ct.a));
+      }
+    });
+  });
+  $('districtList').appendChild(frag);
+})();
+$('districtSearch').addEventListener('change',e=>{
+  const el=e.target,hit=districtMap[el.value.trim()];
+  el.style.borderColor='';
+  if(!hit){ // 自由输入未命中候选：不改变选择，红框提示
+    el.style.borderColor='#ef4444';
+    setTimeout(()=>{el.style.borderColor=''},1600);
+    return;
+  }
+  cfg.prov=hit.p;cfg.city=hit.c;cfg.county=hit.q;
+  $('selProv').value=hit.p;
+  onProv(); // 重建市/县并按 cfg 选中
+});
+$('keywordInput').addEventListener('input',e=>{cfg.keyword=e.target.value;saveCfg()});
+$('intervalInput').addEventListener('change',e=>{cfg.interval=Math.max(0,parseInt(e.target.value)||0);saveCfg()});
+$('depthInput').addEventListener('change',e=>{cfg.depth=Math.min(14,Math.max(1,parseInt(e.target.value)||12));e.target.value=cfg.depth;saveCfg()});
+$('dedupChk').addEventListener('change',e=>{cfg.dedup=e.target.checked;saveCfg()});
+
+/* ================================================================
+ * 3. POI 分类树（官方 POI 分类与编码 V1.06）
+ * ================================================================*/
+const catsPanel=$('catsPanel');
+window.AMAP_CATS.forEach(big=>{
+  const line=document.createElement('div');
+  const lab=document.createElement('label');lab.className='cat-line';
+  const chk=document.createElement('input');chk.type='checkbox';chk.value=big.a;
+  chk.checked=!!cfg.cats[big.a];
+  let box=null; // 中类容器（部分大类无中类）
+  chk.addEventListener('change',()=>{
+    // 勾选/取消大类时，同步清除其中类选择
+    if(chk.checked)cfg.cats[big.a]={};else delete cfg.cats[big.a];
+    if(box)box.querySelectorAll('input').forEach(c=>c.checked=false);
+    refreshCats();saveCfg();
+  });
+  lab.appendChild(chk);lab.appendChild(document.createTextNode(big.n+'　'+big.a));
+  line.appendChild(lab);
+  if(big.mid.length){
+    const exp=document.createElement('span');exp.className='expand';exp.textContent='▸';
+    box=document.createElement('div');box.className='mid-box';
+    big.mid.forEach(m=>{
+      const ml=document.createElement('label');
+      const mc=document.createElement('input');mc.type='checkbox';mc.value=m.a;
+      mc.checked=!!(cfg.cats[big.a]&&cfg.cats[big.a][m.a]);
+      mc.addEventListener('change',()=>{
+        cfg.cats[big.a]=cfg.cats[big.a]||{};
+        if(mc.checked)cfg.cats[big.a][m.a]=1;else delete cfg.cats[big.a][m.a];
+        if(!mc.checked && Object.keys(cfg.cats[big.a]).length===0)delete cfg.cats[big.a];
+        refreshCats();saveCfg();
+      });
+      ml.appendChild(mc);ml.appendChild(document.createTextNode(m.n+' '+m.a));
+      box.appendChild(ml);
+    });
+    exp.addEventListener('click',()=>{box.classList.toggle('open');exp.textContent=box.classList.contains('open')?'▾':'▸'});
+    lab.appendChild(exp);
+    line.appendChild(box);
+  }
+  catsPanel.appendChild(line);
+});
+// 收集 types：勾选了中类用中类码，否则大类码
+function collectTypes(){
+  const codes=[];const names=[];
+  window.AMAP_CATS.forEach(big=>{
+    const sel=cfg.cats[big.a];
+    if(!sel)return;
+    const mids=Object.keys(sel);
+    if(mids.length){mids.forEach(m=>{codes.push(m);
+      const mm=big.mid.find(x=>x.a===m);if(mm)names.push(big.n+'/'+mm.n)});}
+    else{codes.push(big.a);names.push(big.n)}
+  });
+  return {codes:[...new Set(codes)],names};
+}
+function refreshCats(){
+  // 大类复选框状态：有中类勾选 → indeterminate
+  window.AMAP_CATS.forEach(big=>{
+    const chk=catsPanel.querySelector('input[value="'+big.a+'"]');
+    const sel=cfg.cats[big.a];
+    if(sel&&Object.keys(sel).length){chk.checked=false;chk.indeterminate=true;}
+    else{chk.indeterminate=false;chk.checked=!!sel;}
+  });
+  const t=collectTypes();
+  $('catHint').textContent='已选 '+t.codes.length+' 个分类'+(t.codes.length?'：'+t.names.slice(0,4).join('、')+(t.names.length>4?' 等':''):'');
+  const qs=t.codes.join('|');
+  const tl=$('typeLen');tl.textContent=qs.length?'参数长度 '+qs.length:'';
+  tl.style.color=qs.length>1500?'#ef4444':'';
+}
+
+/* ================================================================
+ * 4. 地图
+ * ================================================================*/
+const map=L.map('map',{zoomControl:false}).setView([35.0,108.5],4);
+L.control.zoom({position:'topright'}).addTo(map);
+L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+  {subdomains:['1','2','3','4'],maxZoom:18,attribution:'© 高德地图'}).addTo(map);
+// 布局就绪后强制刷新一次地图尺寸（flex/绝对定位容器的保险）
+requestAnimationFrame(()=>map.invalidateSize());
+window.addEventListener('resize',()=>map.invalidateSize());
+const boundaryLayer=L.featureGroup().addTo(map);
+const gridRenderer=L.canvas({padding:.2});
+const poiRenderer=L.canvas({padding:.5});
+const gridLayer=L.featureGroup().addTo(map);
+const poiLayer=L.featureGroup().addTo(map);
+let rings=null, rootRect=null, boundaryInfo=null;
+
+/* ================================================================
+ * 5. 几何（GCJ-02 经纬度，与 district polyline / 高德瓦片一致）
+ * ================================================================*/
+function pointInRings(x,y,rs){
+  for(const ring of rs){
+    let inside=false;
+    for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+      const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+      if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-15)+xi))inside=!inside;
+    }
+    if(inside)return true;
+  }
+  return false;
+}
+function orient(ax,ay,bx,by,cx,cy){return (bx-ax)*(cy-ay)-(by-ay)*(cx-ax)}
+function segHit(p1,p2,q1,q2){
+  const o1=orient(...p1,...p2,...q1),o2=orient(...p1,...p2,...q2),
+        o3=orient(...q1,...q2,...p1),o4=orient(...q1,...q2,...p2);
+  if(o1===0&&o2===0){return Math.min(p1[0],p2[0])<=Math.max(q1[0],q2[0])&&Math.min(q1[0],q2[0])<=Math.max(p1[0],p2[0])
+    &&Math.min(p1[1],p2[1])<=Math.max(q1[1],q2[1])&&Math.min(q1[1],q2[1])<=Math.max(p1[1],p2[1]);}
+  return ((o1>0)!==(o2>0))&&((o3>0)!==(o4>0));
+}
+function rectIntersectsPolygon(b,rs){
+  const [xmin,ymin,xmax,ymax]=b;
+  const corners=[[xmin,ymin],[xmax,ymin],[xmax,ymax],[xmin,ymax]];
+  for(const [px,py] of corners.concat([[(xmin+xmax)/2,(ymin+ymax)/2]]))
+    if(pointInRings(px,py,rs))return true;
+  const edges=[[corners[0],corners[1]],[corners[1],corners[2]],[corners[2],corners[3]],[corners[3],corners[0]]];
+  for(const ring of rs){
+    for(const [px,py] of ring)
+      if(px>=xmin&&px<=xmax&&py>=ymin&&py<=ymax)return true;
+    for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+      for(const e of edges)if(segHit(ring[j],ring[i],e[0],e[1]))return true;
+    }
+  }
+  return false;
+}
+function splitRect(b){
+  const [xmin,ymin,xmax,ymax]=b,mx=(xmin+xmax)/2,my=(ymin+ymax)/2;
+  return [[xmin,my,mx,ymax],[mx,my,xmax,ymax],[xmin,ymin,mx,my],[mx,ymin,xmax,my]];
+}
+
+/* ================================================================
+ * 6. API 请求（v5 搜索 + v3 区划边界；重试 / 节流 / 致命错误）
+ * ================================================================*/
+const PAGE_SIZE=25, MAX_PAGES=8;                 // 同参数最多 200 条，满则四分
+const FATAL=new Set(['10001','10003','10009','10019','10020','10021','10029','10044']);
+const S={calls:0,ok:0,retry:0,fatal:null};
+class FatalError extends Error{}
+async function apiGet(path,params,tag){
+  const base=baseUrl();
+  if(!base)throw new FatalError('未配置服务域名');
+  const qs=new URLSearchParams(Object.assign({key:cfg.key},params));
+  const url=base+path+'?'+qs.toString();
+  let lastInfo='无响应';
+  for(let attempt=0;attempt<8;attempt++){
+    if(ST.abort)throw new FatalError('已停止');
+    S.calls++;$('callCount').textContent=S.calls;
+    document.querySelectorAll('.topbar .right span')[1].textContent='已用请求 '+S.calls;
+    try{
+      const r=await fetch(url);
+      const d=await r.json();
+      if(String(d.infocode)==='10000'){S.ok++;return d}
+      lastInfo=(d.info||'未知错误')+' ('+d.infocode+')';
+      if(FATAL.has(String(d.infocode))){
+        S.fatal=lastInfo;throw new FatalError(lastInfo);
+      }
+      S.retry++;
+      log((tag||'API')+'：'+lastInfo+'，退避重试…','warn');
+    }catch(e){
+      if(e instanceof FatalError)throw e;
+      lastInfo='网络异常：'+e.message;
+      S.retry++;
+    }
+    await sleep(Math.min(2000+attempt*2000,16000));
+  }
+  return {_failed:true,info:lastInfo};
+}
+// v5 多边形单页
+async function polygonPage(rect,page,types,keyword){
+  const [xmin,ymin,xmax,ymax]=rect;
+  const poly=xmin.toFixed(6)+','+ymax.toFixed(6)+'|'+xmax.toFixed(6)+','+ymin.toFixed(6); // 左上|右下
+  const p={polygon:poly,page_size:PAGE_SIZE,page_num:page,
+           show_fields:'business,photos,navi,indoor'};
+  if(types)p.types=types;
+  if(keyword)p.keywords=keyword;
+  return apiGet('/v5/place/polygon',p,'d? p'+page);
+}
+// v3 区划边界（v5 无区划接口，官方与中转站均提供 v3）
+async function fetchDistrict(adcode){
+  return apiGet('/v3/config/district',{keywords:adcode,sub_district:0,extensions:'all'},'district');
+}
+
+/* ---------- v5 POI → 标准行 ---------- */
+function poiToRow(p){
+  const b=p.business||{},nv=p.navi||{},ind=p.indoor||{};
+  const loc=sv(p.location).split(',');
+  const types=sv(p.type).split(';');
+  const photos=(p.photos||[]).map(x=>sv(x.url)).filter(Boolean).join(';');
+  return {
+    id:sv(p.id),name:sv(p.name),
+    type_l1:types[0]||'',type_l2:types[1]||'',type_l3:types[2]||'',
+    typecode:sv(p.typecode),
+    province:sv(p.pname),city:sv(p.cityname),district:sv(p.adname),
+    adcode:sv(p.adcode),citycode:sv(p.citycode),address:sv(p.address),
+    lon:loc[0]||'',lat:loc[1]||'',
+    tel:sv(b.tel),tags:sv(b.tag),cost:sv(b.cost),rating:sv(b.rating),
+    opentime_week:sv(b.opentime_week),opentime_today:sv(b.opentime_today),
+    business_area:sv(b.business_area),alias:sv(b.alias),parking_type:sv(b.parking_type),
+    entr_location:sv(nv.entr_location),gridcode:sv(nv.gridcode),
+    indoor_map:sv(ind.indoor_map),photos:photos,parent:sv(p.parent)
+  };
+}
+
+/* ================================================================
+ * 7. 采集状态与主流程（显式栈四叉树，移植 amap-poi-search 算法）
+ * ================================================================*/
+const ST={running:false,paused:false,abort:false,pois:new Map(),insideCount:0,
+  leaves:0,splits:0,skipped:0,failed:[],t0:0,maxProgress:0,renderT:0};
+// 新增 POI 时一次性完成「境内」判定并缓存，避免进度/渲染反复做射线法
+function addPoi(p){
+  const row=poiToRow(p);
+  if(!row.id||ST.pois.has(row.id))return;
+  row._in=!!(row.lon&&rings&&pointInRings(+row.lon,+row.lat,rings));
+  ST.pois.set(row.id,row);
+  if(row._in)ST.insideCount++;
+}
+
+function setBtns(running){
+  $('crawlBtn').disabled=running;
+  $('pauseBtn').disabled=!running;
+  $('resumeBtn').disabled=true;
+  $('stopBtn').disabled=!running;
+  $('fetchBoundaryBtn').disabled=running;
+}
+async function waitPaused(){
+  while(ST.paused&&!ST.abort)await sleep(250);
+}
+function drawGrid(rect,kind){
+  const [xmin,ymin,xmax,ymax]=rect;
+  L.rectangle([[ymin,xmin],[ymax,xmax]],{
+    renderer:gridRenderer,weight:kind==='split'?.4:.6,color:kind==='split'?'#d97706':'#16a34a',
+    fillColor:kind==='split'?'#f59e0b':'#22c55e',fillOpacity:kind==='split'?.05:.12
+  }).addTo(gridLayer);
+}
+function updateProgress(stackLen){
+  const processed=ST.leaves+ST.splits;
+  const denom=processed+stackLen;
+  const pct=denom?Math.max(ST.maxProgress,processed/denom*100):0;
+  ST.maxProgress=pct;
+  $('progressBar').style.width=pct.toFixed(1)+'%';
+  const el=Math.floor((Date.now()-ST.t0)/1000),mm=Math.floor(el/60),ss=el%60;
+  $('progressText').innerHTML='格子：叶子 <b>'+ST.leaves+'</b> ｜ 分裂 <b>'+ST.splits+
+    '</b> ｜ 待处理 <b>'+stackLen+'</b> ｜ 区外剔除 '+ST.skipped+(ST.failed.length?' ｜ <span style=color:#ef4444>失败 '+ST.failed.length+'</span>':'');
+  $('statsLine').innerHTML='境内 POI <b>'+ST.insideCount.toLocaleString()+'</b> / 累计原始 <b>'+ST.pois.size.toLocaleString()+
+    '</b> ｜ 请求 '+S.calls+'（重试 '+S.retry+'）｜ 用时 '+mm+'分'+String(ss).padStart(2,'0')+'秒';
+  document.querySelectorAll('.topbar .right span')[0].textContent='POI '+ST.insideCount.toLocaleString();
+  $('floatCount').textContent=ST.insideCount.toLocaleString();
+}
+let renderScheduled=false;
+function scheduleRender(force){
+  const t=Date.now();
+  if(force||t-ST.renderT>2500){
+    ST.renderT=t;renderPois();renderTable(false);renderScheduled=false;
+  }else if(!renderScheduled){
+    renderScheduled=true;
+    setTimeout(()=>{renderPois();renderTable(false);renderScheduled=false;ST.renderT=Date.now()},2600);
+  }
+}
+
+async function crawl(){
+  const adcode=cfg.county, kw=cfg.keyword.trim();
+  const types=collectTypes().codes.join('|');
+  if(types.length>1800){alert('所选类型参数过长（'+types.length+'），请减少中类选择或改用大类');return}
+  if(!types&&!kw){alert('请至少选择一个 POI 类别，或填写关键词');return}
+  if(!rings||!rootRect){alert('请先拉取行政区边界');return}
+  if(!cfg.key){alert('请先填写 API Key');return}
+  if(adcode.endsWith('0000')&&!confirm('当前选择的是省级行政区，全量采集请求量可能非常大。建议选择地级市或区县。确定继续？'))return;
+
+  Object.assign(ST,{running:true,paused:false,abort:false,leaves:0,splits:0,skipped:0,failed:[],t0:Date.now(),maxProgress:0});
+  ST.pois=new Map();ST.insideCount=0;gridLayer.clearLayers();poiLayer.clearLayers();
+  Object.assign(S,{calls:0,ok:0,retry:0,fatal:null});
+  $('crawlPanel').style.display='block';$('logBox').innerHTML='';
+  $('downloadBtn').disabled=true;$('callCount').textContent='0';
+  setBtns(true);
+  const maxDepth=cfg.depth,gap=cfg.interval;
+  log('开始采集：'+boundaryInfo.name+'('+adcode+') types='+(types||'无')+(kw?' keywords='+kw:'')+' 深度上限 '+maxDepth);
+
+  // 单格翻页：返回 'fail' | 'leaf' | 'split'
+  async function drainOne(d,rect){
+    let truncated=false;
+    for(let page=1;page<=MAX_PAGES;page++){
+      if(ST.abort)return 'abort';
+      await waitPaused();
+      const d2=await polygonPage(rect,page,types,kw);
+      if(d2._failed)return 'fail';
+      const pois=d2.pois||[];
+      pois.forEach(addPoi);
+      if(pois.length<PAGE_SIZE)break;          // 末页拉干净
+      if(page===MAX_PAGES)truncated=true;       // 8 页全满 → 不信任，强制四分
+      await sleep(gap);
+    }
+    if(truncated&&d>=maxDepth)
+      log('警告：达到最大深度 '+maxDepth+'，该格可能仍有遗漏（'+rect.map(x=>x.toFixed(4)).join(',')+'）','warn');
+    return truncated&&d<maxDepth?'split':'leaf';
+  }
+
+  let stack=[{d:0,rect:rootRect}];
+  let retryRound=0;const MAX_RETRY=3;
+  try{
+    while(stack.length){
+      if(ST.abort)break;
+      await waitPaused();
+      const {d,rect}=stack.pop();
+      if(!rectIntersectsPolygon(rect,rings)){ST.skipped++;continue}
+      const r=await drainOne(d,rect);
+      if(r==='abort'||ST.abort)break;
+      if(r==='fail'){
+        ST.failed.push({d,rect});
+        log('格子失败，将在本轮末尾重试：d'+d,'err');
+      }else if(r==='split'){
+        ST.splits++;drawGrid(rect,'split');
+        splitRect(rect).forEach(s=>stack.push({d:d+1,rect:s}));
+      }else{
+        ST.leaves++;drawGrid(rect,'leaf');
+      }
+      updateProgress(stack.length);
+      scheduleRender(false);
+      await sleep(gap);
+      // 栈清空但仍有失败格：整批重新压回主循环（其新分裂出的子格也会被正常处理）
+      if(!stack.length&&ST.failed.length&&!ST.abort){
+        if(retryRound>=MAX_RETRY)break;
+        retryRound++;
+        log('失败格第 '+retryRound+' 轮重试：'+ST.failed.length+' 个','warn');
+        stack=ST.failed;ST.failed=[];
+      }
+    }
+  }catch(e){
+    if(e instanceof FatalError){log('致命错误，采集终止：'+e.message,'err');ST.fatal=e.message}
+    else{log('异常：'+e.message,'err');console.error(e)}
+  }
+
+  ST.running=false;setBtns(false);
+  finalize();
+}
+function finalize(){
+  let rows=[...ST.pois.values()].filter(r=>r.lat&&pointInRings(+r.lon,+r.lat,rings));
+  if(cfg.dedup){
+    const seenAddr=new Set(),seenTel=new Set();const before=rows.length;
+    rows=rows.filter(r=>{
+      const ak=r.name+'|'+r.address;
+      const tels=r.tel.split(';').map(t=>t.trim()).filter(t=>t&&!/^(400|100)/.test(t));
+      if((r.address&&seenAddr.has(ak))||tels.some(t=>seenTel.has(r.name+'|'+t)))return false;
+      if(r.address)seenAddr.add(ak);
+      tels.forEach(t=>seenTel.add(r.name+'|'+t));
+      return true;
+    });
+    log('同店清洗：去除 '+(before-rows.length)+' 条重复');
+  }
+  rows.sort((a,b)=>(+b.lat)-(+a.lat)||(+a.lon)-(+b.lon));
+  ST.finalRows=rows;
+  renderPois(true);renderTable(true);
+  updateProgress(0);
+  if(ST.abort)log('已停止。境内保留 '+rows.length+' 条 POI，可下载已采数据','err');
+  else if(ST.fatal)log('采集中止。境内保留 '+rows.length+' 条 POI，请检查 Key/额度后重试','err');
+  else log('✓ 采集完成：'+boundaryInfo.name+' 境内共 '+rows.length+' 条 POI'+(ST.failed.length?'，失败格 '+ST.failed.length:''),'ok');
+  if(rows.length)$('downloadBtn').disabled=false;
+}
+
+/* ================================================================
+ * 8. 地图 POI 渲染 / 结果表 / Popup
+ * ================================================================*/
+function popupHtml(r){
+  let h='<div class="popup-name">'+esc(r.name)+'</div>';
+  const rows=[['类型',r.type_l1+(r.type_l2?' / '+r.type_l2:'')+(r.type_l3?' / '+r.type_l3:'')],
+    ['地址',(r.district||'')+r.address],['电话',r.tel],['评分',r.rating],['人均',r.cost?('¥'+r.cost):''],
+    ['营业',r.opentime_week||r.opentime_today],['今日',r.opentime_today],['标签',r.tags],
+    ['商圈',r.business_area],['别名',r.alias],['编码',r.typecode+' / '+r.id],['坐标',r.lon+','+r.lat]];
+  rows.forEach(([k,v])=>{if(v)h+='<div class="popup-row"><b>'+k+'</b>'+esc(v)+'</div>'});
+  if(r.photos){const u=r.photos.split(';')[0];if(u)h+='<img class="popup-img" src="'+esc(u)+'" referrerpolicy="no-referrer">'}
+  return h;
+}
+function renderPois(){
+  poiLayer.clearLayers();
+  let arr=ST.finalRows||[...ST.pois.values()].filter(r=>r._in);
+  let sampled=false;
+  if(arr.length>80000){ // 超大结果抽样渲染，CSV 仍是全量
+    const step=arr.length/80000;const s=[];for(let i=0;i<arr.length;i+=step)s.push(arr[Math.floor(i)]);arr=s;sampled=true;
+  }
+  const frag=L.featureGroup();
+  arr.forEach(r=>{
+    L.circleMarker([+r.lat,+r.lon],{renderer:poiRenderer,radius:3,weight:.5,color:'#4c3fb0',
+      fillColor:'#6d5ce7',fillOpacity:.8}).bindPopup(()=>popupHtml(r)).addTo(frag);
+  });
+  frag.addTo(poiLayer);
+  if(sampled)log('地图点位超过 8 万，已抽样渲染；CSV 不受影响','warn');
+}
+function renderTable(){
+  const rows=(ST.finalRows||[...ST.pois.values()].filter(r=>r._in)).slice(0,500);
+  const tb=$('poiTbody');
+  tb.innerHTML='';
+  const frag=document.createDocumentFragment();
+  rows.slice(0,500).forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+esc(r.name)+'</td><td class=tag-type>'+esc(r.type_l1)+'</td><td>'+esc(r.type_l2)+
+      '</td><td>'+esc(r.district)+'</td><td>'+esc(r.address)+'</td><td>'+esc(r.tel)+'</td><td>'+esc(r.rating)+
+      '</td><td>'+(r.cost?'¥'+esc(r.cost):'')+'</td><td>'+esc(r.opentime_week||r.opentime_today)+'</td>';
+    tr.addEventListener('click',()=>{map.flyTo([+r.lat,+r.lon],Math.max(map.getZoom(),15),{duration:.6});
+      L.popup().setLatLng([+r.lat,+r.lon]).setContent(popupHtml(r)).openOn(map)});
+    frag.appendChild(tr);
+  });
+  tb.appendChild(frag);
+  const total=(ST.finalRows?ST.finalRows.length:null);
+  $('dtFoot').textContent=(total!=null?('境内共 '+total.toLocaleString()+' 条；'):'')
+    +'表中预览前 '+Math.min(rows.length,500)+' 条，点击行可定位；完整字段请下载 CSV';
+}
+
+/* ================================================================
+ * 9. CSV（extensions=all 全字段，utf-8-sig）
+ * ================================================================*/
+const CSV_FIELDS=['id','name','type_l1','type_l2','type_l3','typecode','province','city','district',
+  'adcode','citycode','address','lon','lat','tel','tags','cost','rating','opentime_week','opentime_today',
+  'business_area','alias','parking_type','entr_location','gridcode','indoor_map','photos','parent'];
+const CSV_HEAD=['poi_id','名称','大类','中类','小类','分类码','省','市','区县','行政区划码','城市码','地址',
+  '经度','纬度','电话','特色标签','人均消费','评分','营业时间(周)','营业时间(今日)','商圈','别名','停车场类型',
+  '入口坐标','地理格ID','室内地图','图片URL(分号分隔)','父POI'];
+function downloadCsv(){
+  const rows=ST.finalRows||[];
+  if(!rows.length)return;
+  const cell=v=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+  let csv='﻿'+CSV_HEAD.join(',')+'\n';
+  for(const r of rows){csv+=CSV_FIELDS.map(f=>cell(r[f])).join(',')+'\n'}
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='poi_'+cfg.county+'_'+boundaryInfo.name+'_'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'.csv';
+  document.body.appendChild(a);a.click();a.remove();
+  log('已导出 CSV：'+rows.length+' 条','ok');
+}
+
+/* ================================================================
+ * 10. 边界拉取 & UI 事件
+ * ================================================================*/
+function showStatus(el,msg,cls){el.style.display='block';el.className='status-box'+(cls?' '+cls:'');el.innerHTML=msg}
+function hideStatus(el){el.style.display='none'}
+
+async function onFetchBoundary(){
+  if(!cfg.key){alert('请先填写 API Key');return}
+  const adcode=cfg.county;
+  const provName=C.provinces.find(p=>p.a===cfg.prov)?.n||'';
+  const cityName=($('selCity').selectedOptions[0]?.textContent||'').replace('（全市）','');
+  const countyName=($('selCounty').selectedOptions[0]?.textContent||'').replace(/^— /,'').replace(' —$','');
+  showStatus($('boundaryStatus'),'正在拉取「'+countyName+'」的真实边界…');
+  try{
+    const d=await fetchDistrict(adcode);
+    const dist=(d.districts||[])[0];
+    if(!dist||!sv(dist.polyline)){showStatus($('boundaryStatus'),'未获取到边界数据：'+sv(d.info),'err');return}
+    rings=sv(dist.polyline).split('|').map(seg=>seg.split(';').filter(Boolean)
+      .map(pair=>pair.split(',').map(Number))).filter(r=>r.length>=3);
+    let minX=180,maxX=-180,minY=90,maxY=-90,verts=0;
+    rings.forEach(r=>r.forEach(([x,y])=>{verts++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y)}));
+    rootRect=[minX,minY,maxX,maxY];
+    boundaryInfo={name:sv(dist.name)||countyName,adcode:sv(dist.adcode)||adcode};
+    boundaryLayer.clearLayers();gridLayer.clearLayers();poiLayer.clearLayers();
+    rings.forEach(r=>L.polygon(r.map(([x,y])=>[y,x]),
+      {color:'#1a73e8',weight:1.5,fillColor:'#1a73e8',fillOpacity:.08}).addTo(boundaryLayer));
+    map.fitBounds([[minY,minX],[maxY,maxX]],{padding:[20,20]});
+    showStatus($('boundaryStatus'),
+      '✓ '+boundaryInfo.name+'（'+boundaryInfo.adcode+'）｜边界环 '+rings.length+' 个、顶点 '+verts+
+      '<br>外接矩形 '+minX.toFixed(4)+','+minY.toFixed(4)+' ~ '+maxX.toFixed(4)+','+maxY.toFixed(4)+
+      '<br><span style=color:#059669>已启用真实边界剪枝与境内过滤，可开始采集</span>','ok');
+    log('边界就绪：'+boundaryInfo.name+'，环 '+rings.length+'，顶点 '+verts);
+  }catch(e){
+    showStatus($('boundaryStatus'),'边界拉取失败：'+esc(e.message)+(S.fatal?'':'（将重试 8 次）'),'err');
+  }
+}
+
+/* ---------- 域名 UI ----------*/
+function syncDomainUI(){
+  document.querySelectorAll('input[name=domainMode]').forEach(r=>r.checked=(r.value===cfg.mode));
+  $('relaySelect').style.display=cfg.mode==='relay'?'':'none';
+  $('customBase').style.display=cfg.mode==='custom'?'':'none';
+  $('relaySelect').value=cfg.relay;$('customBase').value=cfg.custom;
+}
+document.querySelectorAll('input[name=domainMode]').forEach(r=>r.addEventListener('change',()=>{cfg.mode=r.value;saveCfg();syncDomainUI()}));
+$('relaySelect').addEventListener('change',e=>{cfg.relay=e.target.value;saveCfg()});
+$('customBase').addEventListener('change',e=>{cfg.custom=e.target.value.trim();saveCfg()});
+$('apiKey').value=cfg.key;
+$('apiKey').addEventListener('input',e=>{cfg.key=e.target.value.trim();saveCfg()});
+$('eyeBtn').addEventListener('click',()=>{const k=$('apiKey');const p=k.type==='password';k.type=p?'text':'password';$('eyeBtn').textContent=p?'隐藏':'显示'});
+$('clearCfgBtn').addEventListener('click',()=>{if(confirm('清除本机保存的域名/Key/城市等全部配置？')){localStorage.removeItem(LS_KEY);location.reload()}});
+$('testBtn').addEventListener('click',async()=>{
+  if(!cfg.key){alert('请先填写 API Key');return}
+  showStatus($('apiStatus'),'正在用 '+baseUrl()+' 测试 v5 多边形搜索…');
+  const t0=Date.now();
+  try{
+    const d=await polygonPage([116.397,39.918,116.400,39.920],1,'050000','');
+    if(d._failed){showStatus($('apiStatus'),'✗ 测试失败：'+esc(d.info),'err');return}
+    const n=(d.pois||[]).length,p0=(d.pois||[])[0];
+    showStatus($('apiStatus'),
+      '✓ 连接成功（'+(Date.now()-t0)+'ms，infocode 10000，本页 '+n+' 条）<br>'+
+      (p0?'示例：'+esc(p0.name)+' / '+(p0.business&&p0.business.tel?p0.business.tel:'无电话'):'该测试区域无 POI'),'ok');
+  }catch(e){showStatus($('apiStatus'),'✗ '+esc(e.message),'err')}
+});
+
+/* ---------- 控制按钮 ----------*/
+$('fetchBoundaryBtn').addEventListener('click',onFetchBoundary);
+$('crawlBtn').addEventListener('click',crawl);
+$('pauseBtn').addEventListener('click',()=>{ST.paused=true;$('pauseBtn').disabled=true;$('resumeBtn').disabled=false;log('已暂停')});
+$('resumeBtn').addEventListener('click',()=>{ST.paused=false;$('pauseBtn').disabled=false;$('resumeBtn').disabled=true;log('继续')});
+$('stopBtn').addEventListener('click',()=>{if(confirm('确定停止？已采集的数据仍可下载')){ST.abort=true;ST.paused=false}});
+$('downloadBtn').addEventListener('click',downloadCsv);
+$('advToggle').addEventListener('click',()=>{$('advBox').classList.toggle('open');$('advToggle').textContent=$('advBox').classList.contains('open')?'▾ 高级参数':'▸ 高级参数'});
+$('tableToggle').addEventListener('click',()=>$('tableDrawer').classList.add('open'));
+$('tableClose').addEventListener('click',()=>$('tableDrawer').classList.remove('open'));
+
+/* ---------- 初始化 ----------*/
+$('keywordInput').value=cfg.keyword;
+$('intervalInput').value=cfg.interval;$('depthInput').value=cfg.depth;$('dedupChk').checked=!!cfg.dedup;
+syncDomainUI();onProv();refreshCats();
+})();
+</script>
+</body>
+</html>

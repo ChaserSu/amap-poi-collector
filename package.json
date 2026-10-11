@@ -1,0 +1,61 @@
+{
+  "name": "amap-poi-collector",
+  "version": "0.0.1",
+  "description": "高德 POI 数据本地采集桌面版（Web API v5 · 行政区四叉树全量 · extensions=all 全字段）",
+  "main": "main.js",
+  "author": "ChaserSu",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win portable",
+    "dist:mac": "electron-builder --mac dir",
+    "dist:all": "electron-builder --win portable --mac dir"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.chasersu.amap-poi-collector",
+    "productName": "AmapPOICollector",
+    "copyright": "Copyright © 2026 ChaserSu",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "data.js",
+      "vendor/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true
+    },
+    "portable": {
+      "artifactName": "AmapPOICollector-${version}-win-x64-portable.exe"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.png",
+      "artifactName": "AmapPOICollector-${version}-mac-${arch}"
+    },
+    "compression": "normal"
+  }
+}
