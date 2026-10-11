@@ -3,18 +3,18 @@
 基于高德 Web API v5 的 POI 全量采集桌面应用，Electron 打包，**所有请求由本机直接发出，不经过任何第三方服务器**。
 
 > ⚠️ **本项目只是 [ChaserSu/amap-poi-search](https://github.com/ChaserSu/amap-poi-search) 技能（Skill）的图形化界面，且只实现了它的部分功能。**
-> 核心采集算法（四叉树网格、边界剪枝、extensions=all 全字段、同店清洗）均移植自该技能的 Python 脚本，GUI 版没有命令行版能力完整。遇到 bug 或需要新功能时，**建议先安装该技能，让 AI 直接读源码帮你修/扩展**。
+> 核心采集算法（四叉树网格、边界剪枝、extensions=all 全字段、同店清洗）均移植自该技能的 Python 脚本，GUI 版没有命令行版能力完整。遇到 bug 或需要新功能时，**建议安装该技能，让 AI 直接读源码帮你修/扩展，个人也不建议你为了使用图形化界面长期使用该版本**。
 
-## 先装 amap-poi-search 技能（强烈建议）
+## amap-poi-search 技能（强烈建议）
 
-技能是这套工具的"完整能力 + 说明书"，AI 只有读到它才能准确地排查问题、加功能。TRAE CN 安装方式：
+技能是这套工具的"完整能力"的来源，AI可以根据你的需求加功能，修bug。TRAE CN 安装方式：
 
 ```bash
 mkdir -p ~/.trae-cn/skills
 git clone https://github.com/ChaserSu/amap-poi-search.git ~/.trae-cn/skills/amap-poi-search
 ```
 
-重启 TRAE 后，在对话里描述需求即可（例如"帮我给 POI 采集器加上圆形范围采集"）。技能目录中的 `references/` 记录了算法细节、字段映射、错误码与实战踩坑。
+重启 TRAE 后，在对话里描述需求即可，GUI仅仅作为快速演示，展示原理。
 
 ### GUI 版与技能版的功能对照
 
