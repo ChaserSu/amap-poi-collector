@@ -1,6 +1,9 @@
-# 高德 POI 数据采集器（桌面 GUI）
+<img width="2906" height="1814" alt="image" src="https://github.com/user-attachments/assets/0933b282-d90f-49c4-bb30-65f5fd9f1509" /># 高德 POI 数据采集器（桌面 GUI）
 
 基于高德 Web API v5 的 POI 全量采集桌面应用，Electron 打包，**所有请求由本机直接发出，不经过任何第三方服务器**。
+
+<img width="1453" height="907" alt="image (4)" src="https://github.com/user-attachments/assets/df9660dd-6b9b-4a75-bede-ee473e8835ac" />
+
 
 > ⚠️ **本项目只是 [ChaserSu/amap-poi-search](https://github.com/ChaserSu/amap-poi-search) 技能（Skill）的图形化界面，且只实现了它的部分功能。**
 > 核心采集算法（四叉树网格、边界剪枝、extensions=all 全字段、同店清洗）均移植自该技能的 Python 脚本，GUI 版没有命令行版能力完整。遇到 bug 或需要新功能时，**建议安装该技能，让 AI 直接读源码帮你修/扩展，个人也不建议你为了使用图形化界面长期使用该版本**。
